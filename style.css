@@ -2,9 +2,29 @@
     width: 100%;
 }
 .head-top-intro{
+    position: relative;
     display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #ED1A3D;
+    height: 80px;
+    width: 1000px;
+    margin: 41px auto 0px;
+}
+.head-top-intro::before{
+    position: absolute;
+    content: "";
 }
 .prog-1{
-    width: 40px;
-    border-radius: 20px;
+    width: 127px;
+    border-radius: 101px;
+}
+.head-top-title{
+    font-size: 39px;
+    font-weight: bolder;
+    color: #ED1A3D;
+}
+.head-title-box{
+    background-color: white;
+    border-radius: 15px;
 }
