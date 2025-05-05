@@ -1,3 +1,10 @@
 .top-mv{
     width: 100%;
 }
+.head-top-intro{
+    display: flex;
+}
+.prog-1{
+    width: 40px;
+    border-radius: 20px;
+}
