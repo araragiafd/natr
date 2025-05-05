@@ -35,8 +35,8 @@
 }
 .head-anime{
     margin-left: 315px;
+    transition: margin-left 2s
 }
 .head-anime.active{
     margin-left: 31px;
-    transition-duration: 2s;
 }
