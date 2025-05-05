@@ -26,5 +26,24 @@
 }
 .head-title-box{
     background-color: white;
-    border-radius: 15px;
+    border-radius: 64px;
+    width: 521px;
+    height: 80px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+.head-anime{
+    margin-left: 315px;
+}
+.head-anime.active{
+    animation: railgun 2s forwards;
+}
+@keyframes railgun{
+    0%{
+        margin-left: 315px;
+    }
+    100%{
+        margin-left: 31px;
+    }
 }
