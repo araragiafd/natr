@@ -6,6 +6,7 @@ $(function () {
           var wHeight = $(window).height();
 
           if (scroll > hit - wHeight + wHeight / 100) {
+            console.log("addClass実行");
               $(this).addClass("active");
           }
       });
