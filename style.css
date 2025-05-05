@@ -37,13 +37,6 @@
     margin-left: 315px;
 }
 .head-anime.active{
-    animation: railgun 2s forwards;
-}
-@keyframes railgun{
-    0%{
-        margin-left: 315px;
-    }
-    100%{
-        margin-left: 31px;
-    }
+    margin-left: 31px;
+    transition-duration: 2s;
 }
