@@ -14,6 +14,21 @@
 .head-top-intro::before{
     position: absolute;
     content: "";
+    width: 100px;
+    height: 80px;
+    background-color: #ED1A3D;
+    clip-path: polygon(100% 0, 0 49%, 100% 100%);
+    left: -99px;
+}
+.head-top-intro::after{
+    position: absolute;
+    content: "";
+    width: 100px;
+    height: 80px;
+    background-color: #ED1A3D;
+    clip-path: polygon(100% 0, 0 49%, 100% 100%);
+    right: -100px;
+    transform: rotate(180deg);
 }
 .prog-1{
     width: 127px;
@@ -35,7 +50,7 @@
 }
 .head-anime{
     margin-left: 315px;
-    transition: margin-left 2s
+    transition: margin-left 1s
 }
 .head-anime.active{
     margin-left: 31px;
