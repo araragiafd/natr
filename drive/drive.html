@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<title>Tokyo Drive — Highway Edition</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root { color-scheme: dark; }
+  html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,Arial,sans-serif;background:#0b0e12;}
+  #hud{
+    position:absolute;left:12px;top:12px;z-index:10;color:#fff;background:rgba(0,0,0,.45);
+    padding:10px 12px;border-radius:10px;line-height:1.55;font-size:14px;backdrop-filter:blur(4px)
+  }
+  #speed{position:absolute;right:16px;bottom:16px;z-index:10;color:#fff;
+    font-weight:700;font-size:28px;background:rgba(0,0,0,.45);padding:8px 14px;border-radius:12px;}
+  #mini{position:absolute;right:16px;top:16px;width:180px;height:180px;border-radius:12px;overflow:hidden;
+    background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.12);z-index:11}
+  #mini canvas{width:100%;height:100%;display:block}
+</style>
+</head>
+<body>
+<div id="hud">
+  <b>Tokyo Drive</b><br>
+  ↑/W 前進, ↓/S 逆進, ←/A 左, →/D 右, Space ブレーキ, C カメラ切替（追尾/俯瞰/車内）, R リセット<br>
+  ※ 高速道路は地上道路に正確に接続。高架下は当たり判定なし
+</div>
+<div id="speed">0 km/h</div>
+<div id="mini"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ========= グローバル ========= */
+let scene, camera, renderer, clock = new THREE.Clock();
+let car, carBody;
+let keys = {};
+let buildings = [];         // 衝突ボックス（地上ビルのみ）
+let lights = [];            // 交差点信号
+let aiCars = [];            // 地上AI車
+let camMode = 0;            // 0:追尾 1:俯瞰 2:車内
+let vKmh = 0, yaw = 0;      // 車の速度/向き
+
+// ミニマップ
+let miniRenderer, miniCam, miniScene, miniCar;
+
+// 高速道路
+let elevatedPatches = [];   // {heightAt(x,z)}
+let noBuildZones = [];      // 高架/ランプ下にビルを建てないための矩形
+let highwayRectForMini = null;
+
+// スケール
+const CITY = { blocks: 13, spacing: 120, roadW: 18, cross: 30 };
+
+/* ========= 初期化 ========= */
+init();
+animate();
+
+function init(){
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x8fc3ff);
+  scene.fog = new THREE.Fog(0x8fc3ff, 350, 2600);
+
+  camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 6000);
+  camera.position.set(0, 8, 18);
+
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(devicePixelRatio);
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  // ライト
+  scene.add(new THREE.AmbientLight(0xffffff, .55));
+  const sun = new THREE.DirectionalLight(0xffffff, .95);
+  sun.position.set(220, 500, 180);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048,2048);
+  sun.shadow.camera.left = -1400;
+  sun.shadow.camera.right = 1400;
+  sun.shadow.camera.top = 1400;
+  sun.shadow.camera.bottom = -1400;
+  scene.add(sun);
+
+  // 地面
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(8000, 8000),
+    new THREE.MeshLambertMaterial({color:0xaeb7bd})
+  );
+  ground.rotation.x = -Math.PI/2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // 都市（道路・信号・ビル）
+  buildCity();
+
+  // 高速道路（高架＆ランプ＆入口デコ）
+  buildHighway();   // ←修正箇所を含む
+
+  // 車
+  car = makeCar();
+  car.position.set(0, heightAt(0,0), 0);
+  yaw = 0; vKmh = 0;
+  scene.add(car);
+
+  // 地上AI車
+  for(let i=0;i<24;i++) spawnAICar();
+
+  // 入力
+  addEventListener('keydown', e=>{
+    keys[e.key]=true;
+    if(e.key==='c'||e.key==='C') camMode = (camMode+1)%3;
+    if(e.key==='r'||e.key==='R') resetCar();
+  });
+  addEventListener('keyup', e=> keys[e.key]=false);
+  addEventListener('resize', onResize);
+
+  // ミニマップ
+  setupMiniMap();
+}
+
+/* ========= 都市生成 ========= */
+function rand(min,max){ return min + Math.random()*(max-min); }
+function rectContains(rx1,rz1,rx2,rz2, x,z){
+  return (x>=Math.min(rx1,rx2) && x<=Math.max(rx1,rx2) && z>=Math.min(rz1,rz2) && z<=Math.max(rz1,rz2));
+}
+function inNoBuild(x,z){
+  for(const r of noBuildZones){ if(rectContains(r.x1,r.z1,r.x2,r.z2,x,z)) return true; }
+  return false;
+}
+
+function buildCity(){
+  const roadMat = new THREE.MeshLambertMaterial({color:0x2f2f2f});
+  const laneMat = new THREE.MeshBasicMaterial({color:0xffffff});
+  const crossMat= new THREE.MeshLambertMaterial({color:0x3a3a3a});
+
+  const half = Math.floor(CITY.blocks/2);
+  for(let gx=-half; gx<=half; gx++){
+    for(let gz=-half; gz<=half; gz++){
+      const x = gx*CITY.spacing, z = gz*CITY.spacing;
+
+      // 交差
+      const cross = new THREE.Mesh(new THREE.PlaneGeometry(CITY.cross, CITY.cross), crossMat);
+      cross.rotation.x = -Math.PI/2; cross.position.set(x,0.01,z); cross.receiveShadow=true; scene.add(cross);
+
+      // 水平道路
+      if(gx<half){
+        const len = CITY.spacing - CITY.cross;
+        const rd = new THREE.Mesh(new THREE.PlaneGeometry(len, CITY.roadW), roadMat);
+        rd.rotation.x=-Math.PI/2; rd.position.set(x + CITY.spacing/2, 0.02, z); rd.receiveShadow=true; scene.add(rd);
+        const line = new THREE.Mesh(new THREE.PlaneGeometry(len, 0.2), laneMat);
+        line.rotation.x=-Math.PI/2; line.position.set(rd.position.x, 0.03, z); scene.add(line);
+      }
+      // 垂直道路
+      if(gz<half){
+        const len = CITY.spacing - CITY.cross;
+        const rd = new THREE.Mesh(new THREE.PlaneGeometry(CITY.roadW, len), roadMat);
+        rd.rotation.x=-Math.PI/2; rd.position.set(x, 0.02, z + CITY.spacing/2); rd.receiveShadow=true; scene.add(rd);
+        const line = new THREE.Mesh(new THREE.PlaneGeometry(0.2, len), laneMat);
+        line.rotation.x=-Math.PI/2; line.position.set(x, 0.03, rd.position.z); scene.add(line);
+      }
+
+      // ビル（高架/ランプの下は建てない）
+      if(Math.abs(gx)+Math.abs(gz) > 1){
+        spawnBuildingsAround(x, z);
+      }
+
+      // 信号
+      lights.push(createIntersectionLight(x, z, Math.random()*30));
+    }
+  }
+}
+
+function spawnBuildingsAround(cx, cz){
+  const pads = [
+    {ox: CITY.cross/2 + 28, oz: CITY.cross/2 + 28},
+    {ox:-CITY.cross/2 - 28, oz: CITY.cross/2 + 28},
+    {ox: CITY.cross/2 + 28, oz:-CITY.cross/2 - 28},
+    {ox:-CITY.cross/2 - 28, oz:-CITY.cross/2 - 28},
+  ];
+  pads.forEach(p=>{
+    const num = 1 + (Math.random()<0.7?1:0) + (Math.random()<0.25?1:0);
+    for(let i=0;i<num;i++){
+      const w=rand(12,20), d=rand(12,20), h=rand(22,95);
+      const bx = cx + p.ox + rand(-10,10), bz = cz + p.oz + rand(-10,10);
+      if(inNoBuild(bx,bz)) continue;
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
+        new THREE.MeshLambertMaterial({color:new THREE.Color().setHSL(0.58+Math.random()*0.08,0.22,0.5+Math.random()*0.1)}));
+      mesh.position.set(bx, h/2, bz); mesh.castShadow=true; mesh.receiveShadow=true; scene.add(mesh);
+      buildings.push({mesh, w, d, h});   // ←地上ビルだけ衝突対象
+      if(h>45 && Math.random()<0.55){
+        const win = new THREE.PointLight(0xffe9b0, 0.6, 60, 2);
+        win.position.set(bx + rand(-w/4,w/4), rand(10,h-8), bz + rand(-d/4,d/4));
+        scene.add(win);
+      }
+    }
+  });
+}
+
+function createIntersectionLight(x, z, t0=0){
+  const g = new THREE.Group();
+  const mk = (px,pz,ry)=> {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,6,12), new THREE.MeshLambertMaterial({color:0x222}));
+    pole.position.set(px,3,pz); g.add(pole);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(1.6,1.2,0.8), new THREE.MeshLambertMaterial({color:0x111}));
+    head.position.set(px,5.1,pz); head.rotation.y = ry; g.add(head);
+    const lamps = [0xff3b30, 0xffcc00, 0x34c759].map((col,i)=>{
+      const s=new THREE.Mesh(new THREE.SphereGeometry(0.2,12,12), new THREE.MeshBasicMaterial({color:col}));
+      s.position.set(px + Math.sin(ry)*0.45, 5.4 - i*0.35, pz + Math.cos(ry)*0.45); g.add(s); return s;
+    });
+    return lamps;
+  };
+  const lampsNS = mk(x- CITY.cross/2 + 2, z- CITY.cross/2 + 2, 0);
+  const lampsEW = mk(x+ CITY.cross/2 - 2, z+ CITY.cross/2 - 2, Math.PI);
+  scene.add(g);
+  return { pos:new THREE.Vector3(x,0,z), t:t0, stateNS:2, stateEW:0, lampsNS, lampsEW };
+}
+function setLampColors(lamps, st){
+  lamps[0].material.color.set(st===0?0xff3b30:0x330000);
+  lamps[1].material.color.set(st===1?0xffcc00:0x332200);
+  lamps[2].material.color.set(st===2?0x34c759:0x002211);
+}
+function updateLights(dt){
+  for(const L of lights){
+    L.t += dt;
+    const T = L.t % 30;
+    let stNS = 2; if(T<12) stNS=2; else if(T<15) stNS=1; else stNS=0;
+    let stEW = (stNS===2?0:(stNS===1?1:2));
+    if(stNS!==L.stateNS){ L.stateNS=stNS; setLampColors(L.lampsNS, stNS); }
+    if(stEW!==L.stateEW){ L.stateEW=stEW; setLampColors(L.lampsEW, stEW); }
+  }
+}
+
+/* ========= 高速道路（接続修正込み） ========= */
+function buildHighway(){
+  const H = 8;              // 高架デッキ高さ
+  const W = 16;             // 高架路幅
+  const P = CITY.spacing*3; // ループ半径 (=360)
+  const matDeck = new THREE.MeshLambertMaterial({color:0x2b2b2b});
+  const matLine = new THREE.MeshBasicMaterial({color:0xffffff});
+  const matGuard= new THREE.MeshLambertMaterial({color:0x666});
+
+  // ループ：上・下・左・右
+  const gapSize = 22;   // ガード開口半長
+  const westMergeZ = -P + 20;      // 西側合流点
+  const eastMergeZ =  P - 20;      // 東側合流点
+
+  deckRect(-P,  P,  P,  W, H);  // 上辺
+  deckRect(-P,  P, -P,  W, H);  // 下辺
+  deckRectZ(-P, -P,  P,  W, H, [{a:westMergeZ-gapSize, b:westMergeZ+gapSize}]); // 左辺（開口）
+  deckRectZ( P, -P,  P,  W, H, [{a:eastMergeZ-gapSize, b:eastMergeZ+gapSize}]); // 右辺（開口）
+
+  // 地上道路のセンターにスナップしたランプ
+  const groundZNorth = -P - CITY.spacing; // -480
+  const groundZSouth =  P + CITY.spacing; // +480
+  const westX = -P;
+  const eastX =  P;
+
+  makeGroundLead(westX, groundZNorth, 12);
+  rampZ(westX, groundZNorth, westMergeZ, 10, H, false); // 北→上り
+  rampZ(eastX, eastMergeZ,   groundZSouth, 10, H, true); // 上→南へ降り
+
+  decorateRampEntrance(westX, groundZNorth,  Math.PI/2, "S5 首都高", "入口 戸田 / 大宮");
+  decorateRampEntrance(eastX, groundZSouth, -Math.PI/2, "S5 首都高", "出口 戸田 / 大宮");
+
+  highwayRectForMini = {x1:-P, x2:P, z1:-P, z2:P};
+
+  /* ---- 内部関数 ---- */
+
+  // 高架（x方向）
+  function deckRect(x1,x2,z0, w, h){
+    const len = x2 - x1;
+    const deck = new THREE.Mesh(new THREE.PlaneGeometry(len, w), matDeck);
+    deck.rotation.x = -Math.PI/2;
+    deck.position.set((x1+x2)/2, h, z0);
+    deck.receiveShadow = true; deck.castShadow = true;
+    scene.add(deck);
+
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(len, 0.25), matLine);
+    line.rotation.x = -Math.PI/2;
+    line.position.set(deck.position.x, h+0.01, z0);
+    scene.add(line);
+
+    // ガード（見た目のみ）
+    makeGuardBar(x1, x2, z0 - w/2 - 0.4, h+0.6, true);
+    makeGuardBar(x1, x2, z0 + w/2 + 0.4, h+0.6, true);
+
+    // ピア
+    for(let x=x1; x<=x2; x+=30){
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,h,12), new THREE.MeshLambertMaterial({color:0x888}));
+      p.position.set(x, h/2, z0); p.castShadow=true; scene.add(p);
+      noBuildZones.push({x1:x-2, z1:z0-2, x2:x+2, z2:z0+2});
+    }
+
+    elevatedPatches.push({
+      heightAt(x,z){ return (x>=x1 && x<=x2 && z>=z0-w/2 && z<=z0+w/2) ? h : -Infinity; }
+    });
+
+    noBuildZones.push({x1:x1-4, z1:z0-w/2-4, x2:x2+4, z2:z0+w/2+4});
+  }
+
+  // 高架（z方向）— gaps でガード開口
+  function deckRectZ(x0,z1,z2, w, h, gaps=[]){
+    const len = z2 - z1;
+    const deck = new THREE.Mesh(new THREE.PlaneGeometry(w, len), matDeck);
+    deck.rotation.x = -Math.PI/2;
+    deck.position.set(x0, h, (z1+z2)/2);
+    deck.receiveShadow = true; deck.castShadow = true;
+    scene.add(deck);
+
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.25, len), matLine);
+    line.rotation.x = -Math.PI/2;
+    line.position.set(x0, h+0.01, deck.position.z);
+    scene.add(line);
+
+    // ガード（左右エッジ）。gapsに当たる区間は作らない
+    makeGuardBar(z1, z2, x0 - w/2 - 0.4, h+0.6, false, gaps);
+    makeGuardBar(z1, z2, x0 + w/2 + 0.4, h+0.6, false, gaps);
+
+    for(let z=z1; z<=z2; z+=30){
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,h,12), new THREE.MeshLambertMaterial({color:0x888}));
+      p.position.set(x0, h/2, z); p.castShadow=true; scene.add(p);
+      noBuildZones.push({ x1: x0-2, z1: z-2, x2: x0+2, z2: z+2 }); // ← 修正: コロン
+    }
+
+    elevatedPatches.push({
+      heightAt(x,z){ return (x>=x0-w/2 && x<=x0+w/2 && z>=z1 && z<=z2) ? h : -Infinity; }
+    });
+
+    noBuildZones.push({x1:x0-w/2-4, z1:z1-4, x2:x0+w/2+4, z2:z2+4});
+  }
+
+  // ガード（見た目用。buildings[]に入れない＝衝突しない）
+  function makeGuardBar(a1,a2,fixed,y,horiz=true,gaps=[]){
+    const intervals = [];
+    const A = Math.min(a1,a2), B = Math.max(a1,a2);
+    const sorted = gaps.slice().sort((p,q)=>p.a-q.a);
+    let cur = A;
+    for(const g of sorted){
+      const s = Math.max(A, Math.min(B, g.a));
+      const e = Math.max(A, Math.min(B, g.b));
+      if(cur < s) intervals.push([cur, s]);
+      cur = Math.max(cur, e);
+    }
+    if(cur < B) intervals.push([cur, B]);
+
+    const thickness = 0.8, height = 1.2;
+    for(const [s,e] of intervals){
+      const len = Math.max(0, e - s);
+      if(len <= 0.01) continue;
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(horiz?len:thickness, height, horiz?thickness:len),
+        matGuard
+      );
+      mesh.position.set(
+        horiz ? (s+e)/2 : fixed,
+        y,
+        horiz ? fixed : (s+e)/2
+      );
+      mesh.castShadow = true; scene.add(mesh);
+    }
+  }
+
+  // ランプ（z方向）— 線形スロープ
+  function rampZ(x0, zStart, zEnd, width, H, down=false){
+    const L = Math.abs(zEnd - zStart);
+    const theta = Math.atan2(down?-H:H, L);
+
+    const deck = new THREE.Mesh(new THREE.PlaneGeometry(width, L), matDeck);
+    deck.rotation.x = -Math.PI/2;
+    deck.position.set(x0, H/2, (zStart+zEnd)/2);
+    deck.rotateX(theta);
+    deck.receiveShadow=true; deck.castShadow=true;
+    scene.add(deck);
+
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.25, L), matLine);
+    line.rotation.x = -Math.PI/2;
+    line.position.set(x0, H/2+0.02, (zStart+zEnd)/2);
+    line.rotateX(theta);
+    scene.add(line);
+
+    // 見た目ガード（衝突なし）
+    const guardLen = L + 2;
+    const g1 = new THREE.Mesh(new THREE.BoxGeometry(0.8,1.2,guardLen), new THREE.MeshLambertMaterial({color:0x666}));
+    const g2 = g1.clone();
+    g1.position.set(x0 - width/2 - 0.4, H/2+0.6, (zStart+zEnd)/2);
+    g2.position.set(x0 + width/2 + 0.4, H/2+0.6, (zStart+zEnd)/2);
+    g1.rotateX(theta); g2.rotateX(theta);
+    g1.castShadow = g2.castShadow = true;
+    scene.add(g1,g2);
+
+    const z1 = Math.min(zStart,zEnd), z2 = Math.max(zStart,zEnd);
+    elevatedPatches.push({
+      heightAt(x,z){
+        if(Math.abs(x-x0) <= width/2 && z>=z1 && z<=z2){
+          const t = (z - zStart)/ (zEnd - zStart);
+          const h = THREE.MathUtils.clamp(t,0,1) * (down?-H:H);
+          return (down?H:0) + h;
+        }
+        return -Infinity;
+      }
+    });
+
+    noBuildZones.push({x1:x0-width/2-3, z1:z1-3, x2:x0+width/2+3, z2:z2+3});
+  }
+
+  // 入口手前の地上アスファルト
+  function makeGroundLead(x0, zStart, width){
+    const L = 22;
+    const lead = new THREE.Mesh(
+      new THREE.PlaneGeometry(width, L),
+      new THREE.MeshLambertMaterial({color:0x2f2f2f})
+    );
+    lead.rotation.x = -Math.PI/2;
+    lead.position.set(x0, 0.015, zStart - L/2);
+    scene.add(lead);
+
+    // 白線
+    const lineMat = new THREE.MeshBasicMaterial({color:0xffffff});
+    const left = new THREE.Mesh(new THREE.PlaneGeometry(0.2, L), lineMat);
+    const right = left.clone();
+    left.rotation.x = right.rotation.x = -Math.PI/2;
+    left.position.set(x0 - width/2 + 0.6, 0.02, zStart - L/2);
+    right.position.set(x0 + width/2 - 0.6, 0.02, zStart - L/2);
+    scene.add(left,right);
+  }
+
+  // 入口デコ（簡易看板）
+  function decorateRampEntrance(x, z, rotY, title, sub){
+    const g = new THREE.Group();
+    g.position.set(x, 0, z - 8);
+    g.rotation.y = rotY;
+    scene.add(g);
+
+    const arrow = new THREE.Mesh(new THREE.PlaneGeometry(4,8),
+      new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.9}));
+    arrow.rotation.x = -Math.PI/2;
+    arrow.position.set(0, 0.03, 6);
+    g.add(arrow);
+
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,4,16), new THREE.MeshLambertMaterial({color:0xaaa}));
+    pole.position.set(-1.6, 2, 0); g.add(pole);
+    const pole2 = pole.clone(); pole2.position.x = 1.6; g.add(pole2);
+
+    const board = makeBoardTexture(380,120, title, sub);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(7, 2.3), new THREE.MeshBasicMaterial({map:board, transparent:true}));
+    sign.position.set(0, 3.2, 0.2);
+    g.add(sign);
+  }
+  function makeBoardTexture(w,h, t1, t2){
+    const c=document.createElement('canvas'); c.width=w; c.height=h;
+    const ctx=c.getContext('2d');
+    ctx.fillStyle='#1d7d37'; ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=8; ctx.strokeRect(4,4,w-8,h-8);
+    ctx.fillStyle='#fff';
+    ctx.font='bold 34px system-ui,Arial'; ctx.fillText(t1, 18, 48);
+    ctx.font='bold 28px system-ui,Arial'; ctx.fillText(t2, 18, 92);
+    const tex=new THREE.CanvasTexture(c); tex.anisotropy=16; tex.needsUpdate=true;
+    return tex;
+  }
+}
+
+/* ========= 高さサンプリング ========= */
+function heightAt(x,z){
+  let best = 0; // 地上
+  for(const p of elevatedPatches){
+    const h = p.heightAt(x,z);
+    if(h>-Infinity) best = Math.max(best,h);
+  }
+  return best;
+}
+
+/* ========= 車・カメラ ========= */
+function makeCar(){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.6, 4.2),
+    new THREE.MeshLambertMaterial({color:0xe74c3c}));
+  body.position.y = 0.7; body.castShadow = true; g.add(body);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.7, 1.9),
+    new THREE.MeshLambertMaterial({color:0x2c3e50}));
+  cabin.position.set(0,1.05,-0.2); cabin.castShadow = true; g.add(cabin);
+  const wheelGeo = new THREE.CylinderGeometry(0.38,0.38,0.28,16);
+  const wheelMat = new THREE.MeshLambertMaterial({color:0x111});
+  [-0.95,0.95].forEach(x=>{[-1.5,1.5].forEach(z=>{
+    const w=new THREE.Mesh(wheelGeo, wheelMat);
+    w.rotation.z = Math.PI/2; w.position.set(x,0.38,z); w.castShadow = true; g.add(w);
+  });});
+  carBody = { w:2.2, d:4.6, h:1.6 };
+  return g;
+}
+
+function updateCar(dt){
+  const up=keys['ArrowUp']||keys['w']||keys['W'];
+  const dn=keys['ArrowDown']||keys['s']||keys['S'];
+  const lf=keys['ArrowLeft']||keys['a']||keys['A'];
+  const rt=keys['ArrowRight']||keys['d']||keys['D'];
+  const br=keys[' ']===true;
+
+  const CAR = { maxFwd:180, maxRev:-20, accel:55, brake:120, coast:12, steerAt100:1.2 };
+
+  if(up) vKmh += CAR.accel*dt;
+  if(dn) vKmh -= CAR.accel*dt*0.8;
+  if(br) vKmh += (vKmh>0?-CAR.brake:CAR.brake*0.6)*dt;
+  if(!up && !dn && !br){
+    if(vKmh>0) vKmh=Math.max(0, vKmh - CAR.coast*dt);
+    else if(vKmh<0) vKmh=Math.min(0, vKmh + CAR.coast*dt);
+  }
+  vKmh = Math.min(CAR.maxFwd, Math.max(CAR.maxRev, vKmh));
+
+  const steerMaxDeg = CAR.steerAt100 * (100/Math.max(20, Math.abs(vKmh)));
+  const steer = ((lf?1:0) - (rt?1:0)) * THREE.MathUtils.degToRad(steerMaxDeg);
+  yaw += steer;
+
+  const v_ms = vKmh/3.6;
+  const dx = -Math.sin(yaw) * v_ms * dt;
+  const dz = -Math.cos(yaw) * v_ms * dt;
+  const next = car.position.clone().add(new THREE.Vector3(dx,0,dz));
+
+  // 地上ビルとの衝突（高架関連は対象外）
+  let collided=false;
+  for(const b of buildings){
+    const px=next.x, pz=next.z, bx=b.mesh.position.x, bz=b.mesh.position.z;
+    const halfW = (b.w/2 || 0.6) + carBody.w/2 + 0.4;
+    const halfD = (b.d/2 || 0.6) + carBody.d/2 + 0.4;
+    if(Math.abs(px-bx) < halfW && Math.abs(pz-bz) < halfD){ collided=true; break; }
+  }
+  if(!collided) car.position.copy(next);
+  else { vKmh*=0.6; yaw -= steer*0.4; }
+
+  car.rotation.y = yaw;
+
+  // 高さを地形（地上/高架/ランプ）に合わせる
+  const targetY = heightAt(car.position.x, car.position.z);
+  car.position.y += (targetY - car.position.y) * (1 - Math.exp(-10*dt));
+
+  // 信号減速は地上のみ
+  if(targetY < 1.0){
+    for(const L of lights){
+      const dist = car.position.distanceTo(L.pos);
+      if(dist<10){
+        const dirZ = Math.abs(Math.sin(yaw)) < 0.5;
+        const red = dirZ ? (L.stateNS===0) : (L.stateEW===0);
+        if(red && vKmh>6){ vKmh = Math.max(0, vKmh - 90*dt); }
+      }
+    }
+  }
+
+  document.getElementById('speed').textContent = `${Math.max(0, Math.round(Math.abs(vKmh)))} km/h`;
+}
+
+function updateCamera(dt){
+  if(camMode===0){
+    const base = new THREE.Vector3(0,3.5,0).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
+    const back = new THREE.Vector3(0,2.2,7.5).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
+    const targetPos = car.position.clone().add(back).add(base);
+    camera.position.lerp(targetPos, 1 - Math.exp(-8*dt));
+    camera.lookAt(car.position.clone().add(new THREE.Vector3(0,1.2,0)));
+  }else if(camMode===1){
+    const targetPos = car.position.clone().add(new THREE.Vector3(0,80,0));
+    camera.position.lerp(targetPos, 1 - Math.exp(-8*dt));
+    camera.lookAt(car.position);
+  }else{
+    const eye = new THREE.Vector3(0,1.35,0.4).applyAxisAngle(new THREE.Vector3(0,1,0), yaw);
+    camera.position.copy(car.position.clone().add(eye));
+    camera.lookAt(car.position.clone().add(new THREE.Vector3(-Math.sin(yaw)*5,1.2,-Math.cos(yaw)*5)));
+  }
+}
+
+/* ========= 地上AI車 ========= */
+function spawnAICar(){
+  const g = new THREE.Group();
+  const c = new THREE.Mesh(new THREE.BoxGeometry(1.8,0.8,3.4),
+    new THREE.MeshLambertMaterial({color:new THREE.Color().setHSL(Math.random(),0.55,0.55)}));
+  c.castShadow = true; c.position.y = 0.6; g.add(c);
+
+  const dirs = ['E','W','N','S'];
+  const dir = dirs[(Math.random()*dirs.length)|0];
+  const half = Math.floor(CITY.blocks/2);
+  let gx = -half + 1 + ((Math.random()* (CITY.blocks-2))|0);
+  let gz = -half + 1 + ((Math.random()* (CITY.blocks-2))|0);
+  let x = gx*CITY.spacing, z = gz*CITY.spacing;
+  let yawLocal = 0;
+  if(dir==='E'){ z += 4; yawLocal = 0; x -= CITY.spacing/2; }
+  if(dir==='W'){ z -= 4; yawLocal = Math.PI; x += CITY.spacing/2; }
+  if(dir==='N'){ x -= 4; yawLocal = Math.PI/2; z += CITY.spacing/2; }
+  if(dir==='S'){ x += 4; yawLocal = -Math.PI/2; z -= CITY.spacing/2; }
+  g.position.set(x,0,z); g.rotation.y = yawLocal;
+  scene.add(g);
+  aiCars.push({ mesh:g, dir, speed: 34*(0.75+Math.random()*0.5), yaw:yawLocal, cool:0 });
+}
+function nearestLight(ix, iz){
+  let best=null, bd=Infinity;
+  for(const L of lights){
+    const d = Math.hypot(ix-L.pos.x, iz-L.pos.z);
+    if(d<bd){ bd=d; best=L; }
+  }
+  return (bd<5)?best:null;
+}
+function updateAI(dt){
+  const v2m = (kmh)=> kmh/3.6;
+
+  for(let i=0;i<aiCars.length;i++){
+    const a = aiCars[i];
+    a.cool = Math.max(0, a.cool - dt);
+
+    const fwd = new THREE.Vector3(-Math.sin(a.yaw),0,-Math.cos(a.yaw));
+    let ix = Math.round(a.mesh.position.x / CITY.spacing) * CITY.spacing;
+    let iz = Math.round(a.mesh.position.z / CITY.spacing) * CITY.spacing;
+    const cross = new THREE.Vector3(ix,0,iz);
+    const distToCross = a.mesh.position.distanceTo(cross);
+    const L = nearestLight(ix, iz);
+
+    let greenForDir = true;
+    if(L){
+      if(a.dir==='N' || a.dir==='S') greenForDir = (L.stateNS===2) || (L.stateNS===1);
+      else                           greenForDir = (L.stateEW===2) || (L.stateEW===1);
+    }
+
+    if(L && !greenForDir && distToCross < (CITY.cross/2 + 6.5)){
+      a.speed = Math.max(0, a.speed - 22*dt*2);
+    }else{
+      a.speed = Math.min(34*1.3, a.speed + 22*dt*0.6);
+    }
+
+    if(distToCross < 1.2 && a.cool<=0){
+      const r = Math.random();
+      if(r < 0.28){
+        if(a.dir==='E'){ a.dir='N'; a.yaw=Math.PI/2; a.mesh.position.z = iz + CITY.spacing/2 - 4; }
+        else if(a.dir==='W'){ a.dir='S'; a.yaw=-Math.PI/2; a.mesh.position.z = iz - CITY.spacing/2 + 4; }
+        else if(a.dir==='N'){ a.dir='W'; a.yaw=Math.PI; a.mesh.position.x = ix - CITY.spacing/2 + 4; }
+        else if(a.dir==='S'){ a.dir='E'; a.yaw=0; a.mesh.position.x = ix + CITY.spacing/2 - 4; }
+      }else if(r < 0.56){
+        if(a.dir==='E'){ a.dir='S'; a.yaw=-Math.PI/2; a.mesh.position.z = iz - CITY.spacing/2 + 4; }
+        else if(a.dir==='W'){ a.dir='N'; a.yaw=Math.PI/2;  a.mesh.position.z = iz + CITY.spacing/2 - 4; }
+        else if(a.dir==='N'){ a.dir='E'; a.yaw=0;          a.mesh.position.x = ix + CITY.spacing/2 - 4; }
+        else if(a.dir==='S'){ a.dir='W'; a.yaw=Math.PI;    a.mesh.position.x = ix - CITY.spacing/2 + 4; }
+      }
+      a.mesh.rotation.y = a.yaw;
+      a.cool = 0.6;
+    }
+
+    const vms = v2m(a.speed);
+    a.mesh.position.add(fwd.multiplyScalar(vms*dt));
+
+    const lim = CITY.blocks/2*CITY.spacing + 20;
+    if(Math.abs(a.mesh.position.x)>lim || Math.abs(a.mesh.position.z)>lim){
+      scene.remove(a.mesh);
+      aiCars.splice(i,1);
+      spawnAICar();
+    }
+  }
+}
+
+/* ========= ミニマップ ========= */
+function setupMiniMap(){
+  const container = document.getElementById('mini');
+  miniRenderer = new THREE.WebGLRenderer({antialias:false, alpha:true});
+  miniRenderer.setSize(container.clientWidth, container.clientHeight);
+  container.appendChild(miniRenderer.domElement);
+
+  miniScene = new THREE.Scene();
+  miniCam   = new THREE.OrthographicCamera(-220,220,220,-220, 0.1, 1000);
+  miniCam.position.set(0,350,0); miniCam.lookAt(0,0,0);
+
+  const bg = new THREE.Mesh(new THREE.PlaneGeometry(1200,1200), new THREE.MeshBasicMaterial({color:0x0b1320}));
+  bg.rotation.x = -Math.PI/2; miniScene.add(bg);
+
+  const half = Math.floor(CITY.blocks/2);
+  const grid = new THREE.Group();
+  for(let i=-half;i<=half;i++){
+    const x = i*CITY.spacing; grid.add(lineSeg(x,-half*CITY.spacing, x, half*CITY.spacing, 0x506887));
+    const z = i*CITY.spacing; grid.add(lineSeg(-half*CITY.spacing, z, half*CITY.spacing, z, 0x506887));
+  }
+  miniScene.add(grid);
+
+  if(highwayRectForMini){
+    const {x1,x2,z1,z2} = highwayRectForMini;
+    miniScene.add(lineSeg(x1,z1, x2,z1, 0xf9d65c, 3));
+    miniScene.add(lineSeg(x2,z1, x2,z2, 0xf9d65c, 3));
+    miniScene.add(lineSeg(x2,z2, x1,z2, 0xf9d65c, 3));
+    miniScene.add(lineSeg(x1,z2, x1,z1, 0xf9d65c, 3));
+  }
+
+  miniCar   = new THREE.Mesh(new THREE.CircleGeometry(5,18), new THREE.MeshBasicMaterial({color:0x7aa1ff}));
+  miniCar.rotation.x = -Math.PI/2;
+  miniScene.add(miniCar);
+
+  function lineSeg(x1,z1,x2,z2,color=0x7aa1ff, width=1){
+    const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x1,0,z1), new THREE.Vector3(x2,0,z2)]);
+    const m = new THREE.LineBasicMaterial({color, linewidth: width});
+    return new THREE.Line(g, m);
+  }
+}
+function renderMini(){
+  if(!miniRenderer) return;
+  miniCar.position.set(car.position.x, 0.01, car.position.z);
+  miniRenderer.render(miniScene, miniCam);
+}
+
+/* ========= ループ/ユーティリティ ========= */
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.033, clock.getDelta());
+  updateCar(dt);
+  updateCamera(dt);
+  updateAI(dt);
+  updateLights(dt);
+  renderer.render(scene, camera);
+  renderMini();
+}
+function onResize(){
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
+function resetCar(){ vKmh=0; yaw=0; car.position.set(0, heightAt(0,0), 0); car.rotation.y=0; }
+</script>
+</body>
+</html>
