@@ -1,108 +1,413 @@
-.top-mv{
-    width: 100%;
-}
-.head-top-intro{
+body{
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #ED1A3D;
-    height: 80px;
-    width: 1000px;
-    margin: 41px auto 0px;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    cursor: none; /* デフォルトカーソル非表示 */
+    overflow: hidden;
+    
 }
-.head-top-intro::before{
-    position: absolute;
-    content: "";
-    width: 100px;
-    height: 80px;
-    background-color: #ED1A3D;
-    clip-path: polygon(100% 0, 0 49%, 100% 100%);
-    left: -99px;
+* {
+  box-sizing: border-box;
 }
-.trans-big-box{
-    position: absolute;
-    right: -100px;
-    width: 200px;
-    height: 170px;
-    background-color: #ED1A3D;
-    clip-path: polygon(100% 0, 0 49%, 100% 100%);
-    transform: rotate(180deg);
+
+/* ローディング */
+.all-most-out,
+.in-out1,
+.in-out2,
+.in-out3,
+.in-out4,
+.in-triangle1,
+.in-triangle2,
+.in-box,
+.in-triangle3,
+.in-triangle4,
+.in-box2 {
+    pointer-events: none; 
 }
-.trans-big-box.active{
-    animation: triangle 2s ease-in-out forwards;
+.pretend-section-all.active{
+    animation: feeld 3s forwards;
 }
-@keyframes triangle{
+@keyframes feeld{
     0%{
-        width: 200px;
-        height: 170px;
+        opacity: 1;
     }
     100%{
-        width: 100px;
-        height: 80px;
+        opacity: 0;
     }
 }
-.prog-1{
-    width: 127px;
-    border-radius: 101px;
+.pretend-section{
+    position: fixed;
+    width: 150%;
+    height: 150%;
+    right: -30%;
+    bottom: -20%;
 }
-.head-top-title{
-    font-size: 39px;
+.entrance-all-box{
+    position: absolute;
+    top: 240px;
+    right: 730px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+h1{
+    color: black;
+    font-size: 90px;
+    font-style: oblique;
     font-weight: bolder;
-    color: #ED1A3D;
+      text-shadow:
+    -1px -1px 0 azure,
+     1px -1px 0 azure,
+    -1px  1px 0 azure,
+     1px  1px 0 azure;
 }
-.head-title-box{
-    background-color: white;
-    border-radius: 64px;
-    width: 521px;
-    height: 80px;
+.entrance-bottn{
     display: flex;
-    justify-content: space-around;
+    background-color: black;
+    border-radius: 30px;
+    width: 250px;
+    height: 50px;
     align-items: center;
-}
-.head-anime{
-    margin-left: -970px;
- }
-.head-anime.active{
-    animation: railgun 2s ease-in-out forwards;
-}
-@keyframes railgun{
-    0%{
-        margin-left: -970px;
-    }
-    70%{
-        margin-left: 1000px;
-    }
-    95%{
-        margin-left: 340px;
-    }
-    100%{
-        margin-left: 400px;
-    }
-}
-.channel-expla{
-    margin: 30px auto 0px;
-    display: flex;
     justify-content: center;
 }
-.expla-title{
-    font-size: 40px;
+.opening-click{
+    color: aliceblue;
+    font-size: 27px;
     font-weight: bold;
-    color: #ED1A3D;
+    font-style: oblique;
 }
-.splide {
-    max-width: 1600px;
-    margin: 0 auto;
+
+/* <!-- カーソル --> */
+.cursor {
+  width: 20px;
+  height: 20px;
+  background-color: aqua;
+  opacity: 0.3;
+  border: 2px solid black;
+  border-radius: 50%;
+  position: fixed;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: transform 0.2s ease, background-color 0.3s ease;
+  z-index: 9999;
+}
+
+.hover-target:hover ~ .cursor {
+  transform: translate(-50%, -50%) scale(2);
+  background-color: rgba(0, 0, 0, 0.1);
+}
+/* カーソルの軌道にブラー */
+.blur-trail{
+  position: fixed;
+  width: 50px;
+  height: 50px;
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(1px);
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+  animation: fadeOut 1s ease-out forwards;
+}
+
+@keyframes fadeOut {
+  0% {
+    opacity: 1;
   }
+  100% {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
 
+/* <!-- 外枠 --> */
+.all-most-out{
+    position: fixed;
+    border: 20px solid black;
+    width: 100%;
+    height: 100%;
+ 
+}
+.in-out1{
+    position: fixed;
+    background-color: black;
+    width: 44px;
+    height: 74px;
+    left: 7px;
+    top: -11px;
+    transform: rotate(45deg);
+}
+.in-out2{
+    position: fixed;
+    background-color: black;
+    width: 44px;
+    height: 74px;
+    left: 7px;
+    bottom: -11px;
+    transform: rotate(-45deg);
+}
+.in-out3{
+    position: fixed;
+    background-color: black;
+    width: 44px;
+    height: 74px;
+    right: 7px;
+    top: -11px;
+    transform: rotate(-45deg);
+}
+.in-out4{
+    position: fixed;
+    background-color: black;
+    width: 44px;
+    height: 74px;
+    right: 7px;
+    bottom: -11px;
+    transform: rotate(45deg);
+}
+.in-triangle1{
+    position: fixed;
+    clip-path: polygon(100% 100%, 0 44%, 100% 44%);
+    background-color: black;
+    width: 60px;
+    height: 60px;
+    top: -15px;
+    left: 40%;
+}
+.in-triangle2{
+    position: fixed;
+    clip-path: polygon(0 100%, 0 44%, 100% 44%);
+    background-color: black;
+    width: 60px;
+    height: 60px;
+    top: -15px;
+    right: 40%;
+}
+.in-triangle3{
+    position: fixed;
+    clip-path: polygon(100% 0, 0 44%, 100% 44%);
+    background-color: black;
+    width: 60px;
+    height: 60px;
+    bottom: -15px;
+    left: 40%;
+}
+.in-triangle4{
+    position: fixed;
+    clip-path: polygon(0 0, 0 44%, 100% 44%);
+    background-color: black;
+    width: 60px;
+    height: 60px;
+    bottom: -15px;
+    right: 40%;
+}
+.in-box{
+    position: fixed;
+    background-color: black;
+    width: 264px;
+    height: 61px;
+    top: -16px;
+    left: 43.1%
+}
+.in-box2{
+    position: fixed;
+    background-color: black;
+    width: 264px;
+    height: 61px;
+    bottom: -16px;
+    left: 43.1%
+}
+.z-order{
+    z-index: 9998;
+}
 
+/* ホーム画面 */
+.home-all-box{
+    display: none;
+}
+.home-all-box.active{
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.app-all-box{
+    position: fixed;
+    width: 50px;
+    height: 70px;
+    top: 54px;
+    left: 124px;
+}
+.app-box{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100px;
+}
+.app-img{
+    width: 100px;
+    border-radius: 20px;
+}
+.app-text{
+    font-weight: bolder;
+    font-size: 20px;
+}
 
+/* カメラ */
+.all-box{
+    display: none;
+}
+.all-box.active{
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.top-all-box{
+    background-image: url(imges/img3.png);
+    width: 2100px;
+    height: 1025px;
+    animation: cameraShake 2s infinite alternate; /* 継続時間と繰り返しを必要に応じて調整 */
+}
+@keyframes cameraShake {
+    0% {
+        transform: translate(1px, 1px);
+    }
+    25% {
+        transform: translate(-1px, -2px);
+    }
+    50% {
+        transform: translate(-3px, 0px);
+    }
+    75% {
+        transform: translate(2px, -1px);
+    }
+    100% {
+        transform: translate(1px, 2px);
+    }
+}
+.img-woman{
+    margin-left: 240px;
+    width: 1500px;
+    margin-top: -90px;
+}   
+.decorete-rec{
+    position: absolute;
+    display: flex;
+    top: -3px;
+    left: 250px;
+    align-items: center;
+}
+h2{
+    color: white;
+    font-size: 50px;
+}
+.rec-hole{
+    background-color: red;
+    width: 50px;
+    height: 50px;
+    border-radius: 30px;
+    margin-right: 20px;
+    animation: temmetu 01s step-start infinite;
+    margin-top: 5px;
+}
+@keyframes temmetu{
+    50%{
+        opacity: 0;
+    }
+}
+.decorete-text{
+    position: fixed; 
+    transform: rotate(-90deg);
+    right: -120px; 
+    top: 320px;
+    width: 1000px; 
+    height: 80px; 
+    z-index: 10000;
+    display: flex;
+}
 
+.decorete-p{
+    color: white;
+    font-size: 23px;
+    margin: 0 30px;
+}
+.decorete-backcolor{
+    position: fixed;
+    top: 0px;
+    right: 0px;
+    background-color: rgba(0,0,0,0.3);
+    width: 420px;
+    height: 100%;
+}
 
+.chancel-box{
+    position: fixed;
+    width: 80px;
+    height: 80px;
+    bottom: 50px;
+    right: 905px;
+    border-radius: 100px;
+    background-color: azure;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.chancel-p{
+    font-size: 40px;
+}
+/* テトリス */
+.tetoris-box{
+    display: none;
+}
+.tetoris-box.active{
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 99999;
+}
+.tetoris-box iframe{
+    width: 100%;
+    height: 100%;
+    border: none;
+}
 
-
-.aaa{
-    background-color: aqua;
-    height: 5000px;
-    width: 300px;
+/* マリオ */
+.mario-box{
+    display: none;
+}
+.mario-box.active{
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 99999;
+}
+.mario-box iframe{
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+/* ドライブ */
+.drive-box{
+    display: none;
+}
+.drive-box.active{
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 99999;
+}
+.drive-box iframe{
+    width: 100%;
+    height: 100%;
+    border: none;
 }
