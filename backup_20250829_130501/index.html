@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <link rel="stylesheet" href="style.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@splidejs/splide@4.1.4/dist/css/splide.min.css">
+    </head>
+   
+    <body>
+
+    <!-- 導入     -->
+    <div class="pretend-section-all">
+        <div class="pretend-section">
+            <video width="100%" height="100%" autoplay muted>
+                <source src="video,mp4/adcance.mp4" type="video/mp4">
+            </video>
+        </div>
+        
+        <div class="entrance-all-box">
+            <h1>welcome</h1>
+            <div class="entrance-bottn">
+                <p class="opening-click">click</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- カーソル -->
+    <div class="cursor"></div>  
+
+    <!-- 外枠 -->
+    <div class="all-most-out z-order"></div>
+    <div class="in-out1 z-order"></div>        
+    <div class="in-out2 z-order"></div>
+    <div class="in-out3 z-order"></div>
+    <div class="in-out4 z-order"></div>
+    <div class="in-triangle1 z-order"></div>
+    <div class="in-triangle2 z-order"></div>
+    <div class="in-box z-order"></div>
+    <div class="in-triangle3 z-order"></div>
+    <div class="in-triangle4 z-order"></div>
+    <div class="in-box2 z-order"></div>
+
+    <!-- ホーム画面 -->
+    <div class="home-all-box">
+        <div class="app-all-box">
+            <!-- Google-like search box -->
+            <div class="search-container">
+                <form class="google-search" action="https://www.google.com/search" method="get" target="_blank" autocomplete="on">
+                    <input type="text" name="q" class="search-input" placeholder="Google で検索または URL を入力" aria-label="Google search" />
+                    <button type="submit" class="search-button">検索</button>
+                </form>
+            </div>
+            
+            <div class="app-segment-box">
+                <div class="app-box" id="kamera">
+                    <div class="app-img-box">
+                        <img src="./imges/photo.jpg" alt="" class="app-img">
+                    </div>
+                    <p class="app-text">カメラ</p>
+                </div>
+
+                <div class="app-box" id="tetoris">
+                    <div class="app-img-box">
+                        <img src="./imges/tetoris.png" alt="" class="app-img">
+                    </div>
+                    <p class="app-text">テトリス</p>
+                </div>
+
+                <div class="app-box" id="mario">
+                    <div class="app-img-box">
+                        <img src="./imges/mario.png" alt="" class="app-img">
+                    </div>
+                    <p class="app-text">マリオみたいなやつ</p>
+                </div>
+    
+                <div class="app-box" id="drive">
+                    <div class="app-img-box">
+                        <img src="./imges/mario.png" alt="" class="app-img">
+                    </div>
+                    <p class="app-text">ドライブ</p>
+                </div>
+            </div>    
+        </div>
+    </div>
+
+    <!-- カメラ    -->
+    <div class="all-box">
+        <div class="top-all-box">
+            <img src="imges/woman.png" alt="" class="img-woman">
+        </div>
+        <div class="decorete-rec">
+            <div class="rec-hole"></div>
+            <h2>REC</h2>
+        </div>
+            <div class="decorete-backcolor">
+        </div>
+        <div class="decorete-text">
+            <div class="decorete-p">タイムプラス</div>
+            <div class="decorete-p">スロー</div>
+            <div class="decorete-p">ビデオ</div>
+            <div class="decorete-p">写真</div>
+            <div class="decorete-p">ポートレイト</div>
+        </div>
+
+        <div class="chancel-box" id="chancel1">
+            <p class="chancel-p">☓</p> 
+        </div>
+
+    </div>            
+
+        <!-- テトリス -->
+        <div class="tetoris-box"> 
+            <iframe src="tetorisu/tetoris.html" ></iframe>
+            <div class="chancel-box" id="chancel2">
+            <p class="chancel-p">☓</p> 
+        </div>
+        </div>
+     
+    <!-- マリオ -->
+        <div class="mario-box"> 
+            <iframe src="mario/mario.html" ></iframe>
+        </div>
+
+        <!-- ドライブ -->
+        <div class="drive-box"> 
+            <iframe src="drive/drive.html" ></iframe>
+        </div>
+ 
+     
+
+    <script src="https://cdn.jsdelivr.net/npm/@splidejs/splide@4.1.4/dist/js/splide.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>    
+    <script src="https://cdn.jsdelivr.net/npm/@splidejs/splide@4.1.4/dist/js/splide.min.js"></script>
+    <script  src="custom.js"></script>   
+    
+    </body>
+
+
+
+</html>

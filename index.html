@@ -43,35 +43,43 @@
     <!-- ホーム画面 -->
     <div class="home-all-box">
         <div class="app-all-box">
+            <!-- Google-like search box -->
+            <div class="search-container">
+                <form class="google-search" action="https://www.google.com/search" method="get" target="_blank" autocomplete="on">
+                    <input type="text" name="q" class="search-input" placeholder="Google で検索または URL を入力" aria-label="Google search" />
+                    <button type="submit" class="search-button">検索</button>
+                </form>
+            </div>
             
-            <div class="app-box" id="kamera">
-                <div class="app-img-box">
-                    <img src="./imges/photo.jpg" alt="" class="app-img">
+            <div class="app-segment-box">
+                <div class="app-box" id="kamera">
+                    <div class="app-img-box">
+                        <img src="./imges/photo.jpg" alt="" class="app-img">
+                    </div>
+                    <p class="app-text">カメラ</p>
                 </div>
-                <p class="app-text">カメラ</p>
-            </div>
 
-            <div class="tetoris" id="tetoris">
-                <div class="app-img-box">
-                    <img src="./imges/tetoris.png" alt="" class="app-img">
+                <div class="app-box" id="tetoris">
+                    <div class="app-img-box">
+                        <img src="./imges/tetoris.png" alt="" class="app-img">
+                    </div>
+                    <p class="app-text">テトリス</p>
                 </div>
-                <p class="app-text">テトリス</p>
-            </div>
 
-            <div class="tetoris" id="mario">
-                <div class="app-img-box">
-                    <img src="./imges/mario.png" alt="" class="app-img">
+                <div class="app-box" id="mario">
+                    <div class="app-img-box">
+                        <img src="./imges/mario.png" alt="" class="app-img">
+                    </div>
+                    <p class="app-text">マルオ</p>
                 </div>
-                <p class="app-text">マリオみたいなやつ</p>
-            </div>
- 
-            <div class="tetoris" id="drive">
-                <div class="app-img-box">
-                    <img src="./imges/mario.png" alt="" class="app-img">
+    
+                <div class="app-box" id="drive">
+                    <div class="app-img-box">
+                        <img src="./imges/drive.png" alt="" class="app-img">
+                    </div>
+                    <p class="app-text">ドライブ</p>
                 </div>
-                <p class="app-text">ドライブ</p>
-            </div>
-
+            </div>    
         </div>
     </div>
 
@@ -111,11 +119,17 @@
     <!-- マリオ -->
         <div class="mario-box"> 
             <iframe src="mario/mario.html" ></iframe>
+            <div class="chancel-box" id="chancel3">
+                <p class="chancel-p">☓</p> 
+            </div>
         </div>
 
         <!-- ドライブ -->
         <div class="drive-box"> 
             <iframe src="drive/drive.html" ></iframe>
+            <div class="chancel-box" id="chancel4">
+                <p class="chancel-p">☓</p> 
+            </div>
         </div>
  
      
