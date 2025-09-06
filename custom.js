@@ -1,5 +1,3 @@
-
-
 const cursor = document.querySelector(".cursor");
 
 document.addEventListener("mousemove", (e) => {
@@ -21,7 +19,7 @@ document.addEventListener('mousemove', (e) => {
   });
 
 $(document).ready(function() {
-      // .entrance-bottnがクリックされた時の処理
+      // .entrance-bottnがクリチE��された時の処琁E
       $('.entrance-bottn').on('click', function() {
           // .pretend-section-allに'active'クラスを追加する
           $('.pretend-section-all').addClass('active');
@@ -30,7 +28,7 @@ $(document).ready(function() {
     
 
 $(document).ready(function() {
-      // .entrance-bottnがクリックされた時の処理
+      // .entrance-bottnがクリチE��された時の処琁E
       $('.entrance-bottn').on('click', function() {
           // .pretend-section-allに'active'クラスを追加する
           $('.home-all-box').addClass('active');
@@ -38,7 +36,7 @@ $(document).ready(function() {
   });
 
 $(document).ready(function() {
-      // .entrance-bottnがクリックされた時の処理
+      // .entrance-bottnがクリチE��された時の処琁E
       $('#kamera').on('click', function() {
           // .pretend-section-allに'active'クラスを追加する
           $('.all-box').addClass('active');
@@ -46,7 +44,7 @@ $(document).ready(function() {
   });
 
   $(document).ready(function() {
-      // .entrance-bottnがクリックされた時の処理
+      // .entrance-bottnがクリチE��された時の処琁E
       $('#chancel1').on('click', function() {
           // .pretend-section-allに'active'クラスを追加する
           $('.all-box').toggleClass('active');
@@ -54,15 +52,33 @@ $(document).ready(function() {
   });
 
   $(document).ready(function() {
-      // .entrance-bottnがクリックされた時の処理
+      // .entrance-bottnがクリチE��された時の処琁E
       $('#chancel2').on('click', function() {
           // .pretend-section-allに'active'クラスを追加する
           $('.tetoris-box').toggleClass('active');
       });
   });
 
+  $(document).ready(function() {
+      // .entrance-bottnがクリチE��された時の処琁E
+      $('#chancel3').on('click', function() {
+          // .pretend-section-allに'active'クラスを追加する
+          $('.mario-box').toggleClass('active');
+      });
+  });
+
+    $(document).ready(function() {
+      // .entrance-bottnがクリチE��された時の処琁E
+      $('#chancel4').on('click', function() {
+          // .pretend-section-allに'active'クラスを追加する
+          $('.drive-box').toggleClass('active');
+      });
+  });
+
+
+
 $(document).ready(function() {
-      // .entrance-bottnがクリックされた時の処理
+      // .entrance-bottnがクリチE��された時の処琁E
       $('#tetoris').on('click', function() {
           // .pretend-section-allに'active'クラスを追加する
           $('.tetoris-box').addClass('active');
@@ -70,7 +86,7 @@ $(document).ready(function() {
   });
 
 $(document).ready(function() {
-      // .entrance-bottnがクリックされた時の処理
+      // .entrance-bottnがクリチE��された時の処琁E
       $('#mario').on('click', function() {
           // .pretend-section-allに'active'クラスを追加する
           $('.mario-box').addClass('active');
@@ -78,7 +94,7 @@ $(document).ready(function() {
   });
 
   $(document).ready(function() {
-      // .entrance-bottnがクリックされた時の処理
+      // .entrance-bottnがクリチE��された時の処琁E
       $('#drive').on('click', function() {
           // .pretend-section-allに'active'クラスを追加する
           $('.drive-box').addClass('active');
